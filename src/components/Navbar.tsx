@@ -51,12 +51,17 @@ export default function Navbar() {
           </Link>
 
           {user ? (
-            <button
-              onClick={handleSignOut}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              Sign Out
-            </button>
+            <>
+              <Link href="/settings" className="text-sm text-gray-300 hover:text-white transition-colors">
+                Settings
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Sign Out
+              </button>
+            </>
           ) : (
             <Link
               href="/auth/login"
