@@ -7,6 +7,8 @@
 interface CategoryCheck {
   key: string;
   label: string;
+  // Receives the raw answer. Tests that need case-insensitive matching
+  // should lowercase internally; the regex for names needs original case.
   test: (answer: string) => boolean;
 }
 
@@ -16,13 +18,16 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "first_name",
     label: "First Name",
-    // Any capitalized word that isn't a common filler word likely is a name attempt
-    test: (a) => /\b[A-Z][a-z]{1,}(?:\s[A-Z][a-z]+)*\b/.test(a),
+    // Treat any alphabetic word as a possible name attempt. Players often type
+    // in lowercase, so capitalization cannot be required. False positives are
+    // fine — the server-side judge does the real scoring.
+    test: (raw) => /\b[A-Za-z\u00C0-\u024F'’-]{2,}\b/.test(raw.trim()),
   },
   {
     key: "country",
     label: "Country",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const words = [
         "country", "nation", "born in", "from",
         // common countries/regions
@@ -44,7 +49,8 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "profession",
     label: "Profession",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const words = [
         "physicist", "scientist", "composer", "painter", "artist", "author",
         "writer", "poet", "philosopher", "mathematician", "inventor",
@@ -63,7 +69,8 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "creative_works",
     label: "Creative Works",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const patterns = [
         /wrote\b/, /painted\b/, /composed\b/, /created\b/, /built\b/,
         /designed\b/, /published\b/, /directed\b/, /invented\b/,
@@ -78,7 +85,8 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "accomplishments",
     label: "Accomplishments",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const words = [
         "nobel", "prize", "award", "first", "founded", "discovered",
         "pioneered", "revolutionized", "achieved", "won", "established",
@@ -91,7 +99,8 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "famous_associates",
     label: "Famous Associates",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const words = [
         "worked with", "collaborated", "student of", "teacher of",
         "mentor", "friend of", "married", "wife", "husband", "partner",
@@ -104,7 +113,8 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "era",
     label: "Era / Time Period",
-    test: (a) => {
+    test: (raw) => {
+      const a = raw.toLowerCase();
       const patterns = [
         /\b\d{2,4}s?\b/,           // years like 1800, 1900s
         /\bcentury\b/, /\bera\b/,
@@ -119,20 +129,16 @@ const CATEGORY_CHECKS: CategoryCheck[] = [
   {
     key: "extra_facts",
     label: "Extra Facts",
-    test: (a) => {
-      // If the answer is long enough and covers other stuff, they probably have extras
-      return a.length > 200;
-    },
+    test: (raw) => raw.length > 200,
   },
 ];
 
 export function detectCoverage(answer: string): { covered: string[]; missing: string[] } {
-  const lower = answer.toLowerCase();
   const covered: string[] = [];
   const missing: string[] = [];
 
   for (const check of CATEGORY_CHECKS) {
-    if (check.test(lower)) {
+    if (check.test(answer)) {
       covered.push(check.label);
     } else {
       missing.push(check.label);

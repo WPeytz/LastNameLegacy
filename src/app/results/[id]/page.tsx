@@ -3,16 +3,21 @@ import { notFound } from "next/navigation";
 import { EvaluationResultSchema } from "@/lib/scoring";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import Link from "next/link";
+import type { GameMode } from "@/lib/types/database";
 
-interface GameWithSurname {
+interface GameRow {
   id: string;
+  mode: GameMode;
+  surname_id: string | null;
+  living_person_id: string | null;
   answer_text: string;
   total_score: number;
   scores: Record<string, unknown>;
-  surnames: {
-    surname: string;
-    canonical_full_name: string;
-  };
+}
+
+interface SubjectRow {
+  surname: string;
+  canonical_full_name: string;
 }
 
 interface Props {
@@ -25,27 +30,49 @@ export default async function ResultsPage({ params }: Props) {
 
   const { data: game, error } = await supabase
     .from("games")
-    .select("id, answer_text, total_score, scores, surnames(surname, canonical_full_name)")
+    .select("id, mode, surname_id, living_person_id, answer_text, total_score, scores")
     .eq("id", id)
-    .single<GameWithSurname>();
+    .single<GameRow>();
 
   if (error || !game) {
     notFound();
   }
 
+  const mode: GameMode = game.mode ?? "historical";
+  const subjectTable = mode === "living" ? "living_people" : "surnames";
+  const subjectId = mode === "living" ? game.living_person_id : game.surname_id;
+
+  if (!subjectId) {
+    notFound();
+  }
+
+  const { data: subject } = await supabase
+    .from(subjectTable)
+    .select("surname, canonical_full_name")
+    .eq("id", subjectId)
+    .single<SubjectRow>();
+
+  if (!subject) {
+    notFound();
+  }
+
   const evaluation = EvaluationResultSchema.parse(game.scores);
+  const accent = mode === "living" ? "text-emerald-400" : "text-amber-500";
+  const modeLabel = mode === "living" ? "Living Legacy" : "Historical Legacy";
+  const playAgainHref = mode === "living" ? "/play?mode=living" : "/play?mode=historical";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
       <div className="text-center mb-8">
+        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">{modeLabel}</p>
         <p className="text-sm text-gray-400 uppercase tracking-wide mb-1">
           Results for
         </p>
-        <h1 className="text-4xl font-black text-amber-500">
-          {game.surnames.surname}
+        <h1 className={`text-4xl font-black ${accent}`}>
+          {subject.surname}
         </h1>
         <p className="text-gray-400 mt-2">
-          The answer was <span className="text-white font-semibold">{game.surnames.canonical_full_name}</span>
+          The answer was <span className="text-white font-semibold">{subject.canonical_full_name}</span>
         </p>
       </div>
 
@@ -58,7 +85,7 @@ export default async function ResultsPage({ params }: Props) {
 
       <div className="flex gap-3 mt-8">
         <Link
-          href="/play"
+          href={playAgainHref}
           className="flex-1 text-center py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition-colors"
         >
           Play Again

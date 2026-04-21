@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4">
-      <div className="text-center max-w-2xl">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 py-16">
+      <div className="text-center max-w-3xl">
         <h1 className="text-5xl sm:text-7xl font-black tracking-tight mb-4">
           Last Name
           <span className="text-amber-500"> Legacy</span>
@@ -13,16 +13,40 @@ export default function HomePage() {
           You see a famous last name. Write everything you know about them. AI scores your knowledge across 8 categories.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <Link
-            href="/play"
-            className="px-8 py-4 bg-amber-600 hover:bg-amber-500 text-white text-lg font-semibold rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+            href="/play?mode=historical"
+            className="group block bg-gray-900/60 hover:bg-gray-900 border border-gray-800 hover:border-amber-500/60 rounded-xl p-6 text-left transition-colors"
           >
-            Start Playing
+            <p className="text-xs text-amber-500 uppercase tracking-wide mb-2">Mode 1</p>
+            <h2 className="text-2xl font-bold mb-2">Historical Legacy</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Einstein, Curie, Shakespeare — the greats from across history.
+            </p>
+            <span className="inline-block text-sm text-amber-400 group-hover:text-amber-300 font-semibold">
+              Play historical →
+            </span>
           </Link>
+
+          <Link
+            href="/play?mode=living"
+            className="group block bg-gray-900/60 hover:bg-gray-900 border border-gray-800 hover:border-emerald-500/60 rounded-xl p-6 text-left transition-colors"
+          >
+            <p className="text-xs text-emerald-400 uppercase tracking-wide mb-2">Mode 2</p>
+            <h2 className="text-2xl font-bold mb-2">Living Legacy</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Musk, Beyoncé, Messi — icons shaping the world today.
+            </p>
+            <span className="inline-block text-sm text-emerald-400 group-hover:text-emerald-300 font-semibold">
+              Play living →
+            </span>
+          </Link>
+        </div>
+
+        <div className="flex justify-center">
           <Link
             href="/leaderboard"
-            className="px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white text-lg font-semibold rounded-xl transition-colors border border-gray-700"
+            className="text-sm text-gray-400 hover:text-white transition-colors underline underline-offset-4"
           >
             View Leaderboard
           </Link>
@@ -32,7 +56,7 @@ export default function HomePage() {
           <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
             <h3 className="font-semibold text-amber-500 mb-2">See a Last Name</h3>
             <p className="text-sm text-gray-400">
-              You&apos;re shown a famous surname like &quot;Einstein&quot; or &quot;Curie&quot;. No other clues.
+              You&apos;re shown a famous surname like &quot;Einstein&quot; or &quot;Musk&quot;. No other clues.
             </p>
           </div>
           <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">

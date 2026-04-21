@@ -7,15 +7,20 @@ import {
   computeTotal,
 } from "@/lib/scoring";
 import { createClient } from "@/lib/supabase/server";
-import type { Surname, Game, Profile } from "@/lib/types/database";
+import type { Surname, Game, Profile, GameMode } from "@/lib/types/database";
 
 const RequestSchema = z.object({
-  surnameId: z.string().uuid(),
+  subjectId: z.string().uuid(),
   answer: z.string().min(1).max(5000),
+  mode: z.enum(["historical", "living"]).default("historical"),
 });
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+function tableForMode(mode: GameMode) {
+  return mode === "living" ? "living_people" : "surnames";
 }
 
 export async function POST(request: NextRequest) {
@@ -38,30 +43,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { surnameId, answer } = parsed.data;
+    const { subjectId, answer, mode } = parsed.data;
+    const table = tableForMode(mode);
 
-    // Fetch the surname
-    const { data: surname, error: surnameError } = await supabase
-      .from("surnames")
+    // Fetch the subject from the correct table
+    const { data: subject, error: subjectError } = await supabase
+      .from(table)
       .select("*")
-      .eq("id", surnameId)
+      .eq("id", subjectId)
       .single<Surname>();
 
-    if (surnameError || !surname) {
-      return NextResponse.json({ error: "Surname not found" }, { status: 404 });
+    if (subjectError || !subject) {
+      return NextResponse.json({ error: "Subject not found" }, { status: 404 });
     }
 
-    // Build the evaluation prompt
     const categoryList = SCORING_CATEGORIES.map(
       (c) => `- ${c.key}: ${c.label} (max ${c.maxPoints} pts, weight by correctness 0/0.5/1)`
     ).join("\n");
 
-    const prompt = `You are a trivia judge for the game "Last Name Legacy". The player was shown only the surname "${surname.surname}" and must describe the famous person associated with it.
+    const modeBlurb =
+      mode === "living"
+        ? `This is the "Living Legacy" mode — the answer is a currently living public figure.`
+        : `This is the "Historical Legacy" mode — the answer is a notable historical figure.`;
 
-The canonical person is: ${surname.canonical_full_name}
-- Country: ${surname.country}
-- Profession: ${surname.profession}
-- Era: ${surname.era}
+    const prompt = `You are a trivia judge for the game "Last Name Legacy". ${modeBlurb} The player was shown only the surname "${subject.surname}" and must describe the famous person associated with it.
+
+The canonical person is: ${subject.canonical_full_name}
+- Country: ${subject.country}
+- Profession: ${subject.profession}
+- Era: ${subject.era}
 
 The player wrote:
 "${answer}"
@@ -105,12 +115,14 @@ Respond with ONLY valid JSON matching this exact structure (no markdown, no expl
     const evaluation = EvaluationResultSchema.parse(rawJson);
     const totalScore = computeTotal(evaluation);
 
-    // Save the game
+    const subjectColumn = mode === "living" ? "living_person_id" : "surname_id";
+
     const { data: game, error: gameError } = await supabase
       .from("games")
       .insert({
         user_id: user.id,
-        surname_id: surnameId,
+        mode,
+        [subjectColumn]: subjectId,
         answer_text: answer,
         total_score: totalScore,
         scores: evaluation,
@@ -126,7 +138,6 @@ Respond with ONLY valid JSON matching this exact structure (no markdown, no expl
       );
     }
 
-    // Update profile stats
     const { data: profile } = await supabase
       .from("profiles")
       .select("total_games, total_score")
@@ -145,10 +156,11 @@ Respond with ONLY valid JSON matching this exact structure (no markdown, no expl
 
     return NextResponse.json({
       gameId: game.id,
+      mode,
       evaluation,
       totalScore,
-      surname: surname.surname,
-      canonicalName: surname.canonical_full_name,
+      surname: subject.surname,
+      canonicalName: subject.canonical_full_name,
     });
   } catch (error) {
     console.error("Evaluation error:", error);

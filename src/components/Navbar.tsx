@@ -37,8 +37,11 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6">
-          <Link href="/play" className="text-sm text-gray-300 hover:text-white transition-colors">
-            Play
+          <Link href="/play?mode=historical" className="text-sm text-gray-300 hover:text-white transition-colors">
+            Historical
+          </Link>
+          <Link href="/play?mode=living" className="text-sm text-gray-300 hover:text-white transition-colors">
+            Living
           </Link>
           <Link href="/leaderboard" className="text-sm text-gray-300 hover:text-white transition-colors">
             Leaderboard

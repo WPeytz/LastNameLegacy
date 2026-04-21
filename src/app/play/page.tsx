@@ -1,20 +1,48 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { detectCoverage } from "@/lib/coverage";
+import { isGameMode, type GameMode } from "@/lib/types/database";
 
 const TIMER_SECONDS = 90;
 
-interface SurnameData {
+interface SubjectData {
   id: string;
   surname: string;
   hint: string | null;
 }
 
+const MODE_META: Record<GameMode, { title: string; accent: string; tagline: string }> = {
+  historical: {
+    title: "Historical Legacy",
+    accent: "text-amber-500",
+    tagline: "Who is this historical figure?",
+  },
+  living: {
+    title: "Living Legacy",
+    accent: "text-emerald-400",
+    tagline: "Which living icon has this last name?",
+  },
+};
+
 export default function PlayPage() {
-  const [surname, setSurname] = useState<SurnameData | null>(null);
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+          <div className="animate-pulse text-gray-400">Loading your challenge...</div>
+        </div>
+      }
+    >
+      <PlayPageInner />
+    </Suspense>
+  );
+}
+
+function PlayPageInner() {
+  const [subject, setSubject] = useState<SubjectData | null>(null);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -24,7 +52,12 @@ export default function PlayPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  const modeParam = searchParams.get("mode");
+  const mode: GameMode = isGameMode(modeParam) ? modeParam : "historical";
+  const meta = MODE_META[mode];
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -51,6 +84,23 @@ export default function PlayPage() {
     return () => stopTimer();
   }, [stopTimer]);
 
+  const fetchSubject = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    stopTimer();
+    try {
+      const res = await fetch(`/api/game?mode=${mode}`);
+      if (!res.ok) throw new Error("Failed to load subject");
+      const data = await res.json();
+      setSubject(data);
+      startTimer();
+    } catch {
+      setError("Failed to load a subject. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [mode, startTimer, stopTimer]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
@@ -59,38 +109,20 @@ export default function PlayPage() {
         return;
       }
       setAuthed(true);
-      fetchSurname();
+      fetchSubject();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mode]);
 
-  async function fetchSurname() {
-    setLoading(true);
-    setError("");
-    stopTimer();
-    try {
-      const res = await fetch("/api/game");
-      if (!res.ok) throw new Error("Failed to load surname");
-      const data = await res.json();
-      setSurname(data);
-      startTimer();
-    } catch {
-      setError("Failed to load a surname. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Auto-submit when timer hits 0
   useEffect(() => {
-    if (timeLeft === 0 && surname && !submitting && answer.trim()) {
+    if (timeLeft === 0 && subject && !submitting && answer.trim()) {
       formRef.current?.requestSubmit();
     }
-  }, [timeLeft, surname, submitting, answer]);
+  }, [timeLeft, subject, submitting, answer]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!surname || !answer.trim()) return;
+    if (!subject || !answer.trim()) return;
 
     stopTimer();
     setSubmitting(true);
@@ -100,7 +132,7 @@ export default function PlayPage() {
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ surnameId: surname.id, answer: answer.trim() }),
+        body: JSON.stringify({ subjectId: subject.id, answer: answer.trim(), mode }),
       });
 
       if (!res.ok) {
@@ -141,28 +173,55 @@ export default function PlayPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
+          <span className={`font-semibold ${meta.accent}`}>{meta.title}</span>
+        </div>
+        <div className="flex gap-2 text-xs">
+          <a
+            href="/play?mode=historical"
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              mode === "historical"
+                ? "border-amber-500 text-amber-400"
+                : "border-gray-700 text-gray-400 hover:text-white"
+            }`}
+          >
+            Historical
+          </a>
+          <a
+            href="/play?mode=living"
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              mode === "living"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-gray-700 text-gray-400 hover:text-white"
+            }`}
+          >
+            Living
+          </a>
+        </div>
+      </div>
+
       {error && (
         <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm mb-6">
           {error}
         </div>
       )}
 
-      {surname && (
+      {subject && (
         <>
           <div className="text-center mb-10">
             <p className="text-sm text-gray-400 uppercase tracking-wide mb-2">
-              Who is this person?
+              {meta.tagline}
             </p>
-            <h1 className="text-6xl font-black text-amber-500 tracking-tight">
-              {surname.surname}
+            <h1 className={`text-6xl font-black tracking-tight ${meta.accent}`}>
+              {subject.surname}
             </h1>
-            {surname.hint && (
+            {subject.hint && (
               <p className="text-gray-500 text-sm mt-3">
-                Hint: {surname.hint}
+                Hint: {subject.hint}
               </p>
             )}
 
-            {/* Timer */}
             <div className="mt-6">
               <div className={`text-3xl font-mono font-bold tabular-nums ${timeLeft <= 10 ? "text-red-500" : timeLeft <= 30 ? "text-amber-400" : "text-white"}`}>
                 {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
@@ -195,7 +254,6 @@ export default function PlayPage() {
                 {answer.length} / 5000
               </div>
 
-              {/* Live coverage tracker */}
               <CoverageTracker answer={answer} />
             </div>
 
@@ -212,7 +270,7 @@ export default function PlayPage() {
                 onClick={() => {
                   stopTimer();
                   setAnswer("");
-                  fetchSurname();
+                  fetchSubject();
                 }}
                 disabled={submitting}
                 className="px-6 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors"
