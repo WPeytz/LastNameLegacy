@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function SignUpPage() {
@@ -11,7 +10,7 @@ export default function SignUpPage() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const supabase = createClient();
 
   async function handleSignUp(e: React.FormEvent) {
@@ -30,10 +29,55 @@ export default function SignUpPage() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
-      router.push("/");
-      router.refresh();
+      return;
     }
+
+    setSentTo(email);
+    setLoading(false);
+  }
+
+  if (sentTo) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-6 w-14 h-14 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl">
+            ✉
+          </div>
+          <h1 className="text-3xl font-bold">Check your email</h1>
+          <p className="text-gray-400 mt-3">
+            We sent a confirmation link to{" "}
+            <span className="text-white font-semibold">{sentTo}</span>.
+            Click it to activate your account, then come back to sign in.
+          </p>
+          <p className="text-sm text-gray-500 mt-4">
+            Didn&apos;t get it? Check your spam folder, or{" "}
+            <button
+              type="button"
+              onClick={() => setSentTo(null)}
+              className="text-amber-500 hover:text-amber-400 underline underline-offset-4"
+            >
+              try a different email
+            </button>
+            .
+          </p>
+
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/auth/login"
+              className="px-5 py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition-colors"
+            >
+              Go to Sign In
+            </Link>
+            <Link
+              href="/"
+              className="px-5 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors border border-gray-700"
+            >
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
