@@ -13,7 +13,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [nameMessage, setNameMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -41,13 +41,13 @@ export default function SettingsPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("username")
         .eq("id", user.id)
         .single();
 
       if (cancelled) return;
 
-      setDisplayName(profile?.display_name ?? "");
+      setUsername(profile?.username ?? "");
       setLoadingUser(false);
     })();
 
@@ -60,9 +60,12 @@ export default function SettingsPage() {
     e.preventDefault();
     if (!user) return;
 
-    const trimmed = displayName.trim();
-    if (!trimmed) {
-      setNameMessage({ type: "err", text: "Display name can't be empty." });
+    const trimmed = username.trim();
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(trimmed)) {
+      setNameMessage({
+        type: "err",
+        text: "Username must be 3-20 characters: letters, numbers, or underscores.",
+      });
       return;
     }
 
@@ -71,19 +74,24 @@ export default function SettingsPage() {
 
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ display_name: trimmed })
+      .update({ username: trimmed })
       .eq("id", user.id);
 
     if (profileError) {
       setSavingName(false);
-      setNameMessage({ type: "err", text: profileError.message });
+      setNameMessage({
+        type: "err",
+        text: profileError.message.includes("duplicate")
+          ? "That username is already taken."
+          : profileError.message,
+      });
       return;
     }
 
-    await supabase.auth.updateUser({ data: { display_name: trimmed } });
+    await supabase.auth.updateUser({ data: { username: trimmed } });
 
     setSavingName(false);
-    setNameMessage({ type: "ok", text: "Display name updated." });
+    setNameMessage({ type: "ok", text: "Username updated." });
   }
 
   async function handleDeleteAccount() {
@@ -120,15 +128,21 @@ export default function SettingsPage() {
         </div>
 
         <section className="bg-gray-900/60 border border-gray-800 rounded-xl p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Display name</h2>
+          <h2 className="text-lg font-semibold mb-4">Username</h2>
+          <p className="text-sm text-gray-400 mb-3">
+            Shared with your PeytzGames account.
+          </p>
           <form onSubmit={handleSaveName} className="space-y-4">
             <input
               type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              maxLength={40}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              minLength={3}
+              maxLength={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              title="3-20 characters: letters, numbers, or underscores"
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-white"
-              placeholder="Your display name"
+              placeholder="Your username"
             />
 
             {nameMessage && (
@@ -161,7 +175,8 @@ export default function SettingsPage() {
         <section className="bg-gray-900/60 border border-red-900/50 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-red-300 mb-2">Delete account</h2>
           <p className="text-sm text-gray-400 mb-4">
-            This permanently deletes your account, profile, and game history. This cannot be undone.
+            This permanently deletes your shared PeytzGames account, including your profile, game
+            history, and arcade scores on peytzgames.com. This cannot be undone.
           </p>
 
           {!confirmOpen ? (

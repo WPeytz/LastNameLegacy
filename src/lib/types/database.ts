@@ -34,7 +34,7 @@ export interface Game {
 
 export interface Profile {
   id: string;
-  display_name: string;
+  username: string;
   total_games: number;
   total_score: number;
   created_at: string;

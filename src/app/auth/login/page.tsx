@@ -37,7 +37,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold">Welcome Back</h1>
-          <p className="text-gray-400 mt-2">Sign in to continue playing</p>
+          <p className="text-gray-400 mt-2">
+            Sign in to continue playing — your PeytzGames account works here too
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

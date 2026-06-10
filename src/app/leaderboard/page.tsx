@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 interface ProfileRow {
   id: string;
-  display_name: string;
+  username: string;
   total_games: number;
   total_score: number;
 }
@@ -12,7 +12,7 @@ export default async function LeaderboardPage() {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, display_name, total_games, total_score")
+    .select("id, username, total_games, total_score")
     .gt("total_games", 0)
     .order("total_score", { ascending: false })
     .limit(50)
@@ -66,7 +66,7 @@ export default async function LeaderboardPage() {
                       <span className="text-gray-500">{i + 1}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-medium">{player.display_name}</td>
+                  <td className="px-4 py-3 font-medium">{player.username}</td>
                   <td className="px-4 py-3 text-right text-amber-500 font-semibold">
                     {player.avgScore}
                   </td>

@@ -4,10 +4,12 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
+
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -18,11 +20,31 @@ export default function SignUpPage() {
     setLoading(true);
     setError("");
 
+    const trimmed = username.trim();
+    if (!USERNAME_PATTERN.test(trimmed)) {
+      setError("Username must be 3-20 characters: letters, numbers, or underscores.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: taken } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmed)
+      .maybeSingle();
+
+    if (taken) {
+      setError("That username is already taken.");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { display_name: displayName },
+        data: { username: trimmed },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
@@ -96,18 +118,25 @@ export default function SignUpPage() {
           )}
 
           <div>
-            <label htmlFor="displayName" className="block text-sm font-medium text-gray-300 mb-1">
-              Display Name
+            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
+              Username
             </label>
             <input
-              id="displayName"
+              id="username"
               type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
+              minLength={3}
+              maxLength={20}
+              pattern="[A-Za-z0-9_]{3,20}"
+              title="3-20 characters: letters, numbers, or underscores"
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-white"
-              placeholder="Your display name"
+              placeholder="Your username"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Shared with your PeytzGames account — 3-20 letters, numbers, or underscores.
+            </p>
           </div>
 
           <div>
