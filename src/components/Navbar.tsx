@@ -2,12 +2,27 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
+// Whether we're rendered inside an iframe (the PeytzGames embed). Read via
+// useSyncExternalStore so the server snapshot is always `false` and the client
+// reads the real value without a setState-in-effect.
+const subscribe = () => () => {};
+function useIsEmbedded() {
+  return useSyncExternalStore(
+    subscribe,
+    () => window.self !== window.top,
+    () => false,
+  );
+}
+
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
+  // When embedded in PeytzGames, auth is controlled by the host (single
+  // sign-on via SessionBridge), so we hide our own Sign In / Sign Out.
+  const embedded = useIsEmbedded();
   const router = useRouter();
   const supabase = createClient();
 
@@ -55,20 +70,26 @@ export default function Navbar() {
               <Link href="/settings" className="text-sm text-gray-300 hover:text-white transition-colors">
                 Settings
               </Link>
-              <button
-                onClick={handleSignOut}
-                className="text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Sign Out
-              </button>
+              {!embedded && (
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  Sign Out
+                </button>
+              )}
             </>
           ) : (
-            <Link
-              href="/auth/login"
-              className="text-sm bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Sign In
-            </Link>
+            // Logged out: only offer Sign In on the standalone site. Inside the
+            // PeytzGames embed the host bridges the session in for us.
+            !embedded && (
+              <Link
+                href="/auth/login"
+                className="text-sm bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Sign In
+              </Link>
+            )
           )}
         </div>
       </div>

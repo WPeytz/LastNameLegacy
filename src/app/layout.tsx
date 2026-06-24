@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import EmbedResizer from "@/components/EmbedResizer";
+import SessionBridge from "@/components/SessionBridge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-gray-950 text-white">
         <EmbedResizer />
+        <SessionBridge />
         <Navbar />
         <main className="flex-1">{children}</main>
       </body>
