@@ -9,13 +9,15 @@ export default function EmbedResizer() {
   useEffect(() => {
     if (window.self === window.top) return;
 
-    // html/body height and min-h-screen all track the iframe's viewport, so
-    // the reported height would ratchet upward forever as the parent grows
-    // the iframe. Pin them to natural/fixed sizes while embedded.
+    // html/body height and any viewport-relative min-height (min-h-screen, or
+    // arbitrary values like min-h-[calc(100vh-4rem)]) all track the iframe's
+    // viewport, so the reported height would ratchet upward forever as the
+    // parent grows the iframe. Pin them to natural sizes while embedded.
     const style = document.createElement("style");
     style.textContent = `
       html, body { height: auto !important; min-height: 0 !important; }
-      .min-h-screen { min-height: 600px !important; }
+      .min-h-screen,
+      [class*="min-h-["] { min-height: 0 !important; }
     `;
     document.head.appendChild(style);
 
