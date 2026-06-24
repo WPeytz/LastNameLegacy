@@ -1,12 +1,31 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { detectCoverage } from "@/lib/coverage";
 import { isGameMode, type GameMode } from "@/lib/types/database";
 
 const TIMER_SECONDS = 90;
+
+// Whether we're inside the PeytzGames iframe. Read via useSyncExternalStore so
+// the server snapshot is always false and the client reads the real value.
+const subscribeNoop = () => () => {};
+function useIsEmbedded() {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => window.self !== window.top,
+    () => false,
+  );
+}
 
 interface SubjectData {
   id: string;
@@ -54,6 +73,22 @@ function PlayPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const embedded = useIsEmbedded();
+
+  // Attach the current access token so API routes authenticate even when
+  // third-party cookies are blocked (the PeytzGames cross-site embed).
+  const authHeaders = useCallback(
+    async (extra?: Record<string, string>) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      return {
+        ...(extra ?? {}),
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      };
+    },
+    [supabase],
+  );
 
   const modeParam = searchParams.get("mode");
   const mode: GameMode = isGameMode(modeParam) ? modeParam : "historical";
@@ -89,7 +124,9 @@ function PlayPageInner() {
     setError("");
     stopTimer();
     try {
-      const res = await fetch(`/api/game?mode=${mode}`);
+      const res = await fetch(`/api/game?mode=${mode}`, {
+        headers: await authHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to load subject");
       const data = await res.json();
       setSubject(data);
@@ -99,20 +136,55 @@ function PlayPageInner() {
     } finally {
       setLoading(false);
     }
-  }, [mode, startTimer, stopTimer]);
+  }, [mode, startTimer, stopTimer, authHeaders]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let sub: { unsubscribe: () => void } | undefined;
+
+    const onAuthed = () => {
+      if (cancelled) return;
+      setAuthed(true);
+      fetchSubject();
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      if (session) {
+        onAuthed();
+        return;
+      }
+      if (!embedded) {
         setAuthed(false);
         setLoading(false);
         return;
       }
-      setAuthed(true);
-      fetchSubject();
+      // Embedded in PeytzGames: the session is bridged in asynchronously via
+      // postMessage. Wait for it instead of bouncing to our own login.
+      const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+        if (next) {
+          sub?.unsubscribe();
+          if (timeout) clearTimeout(timeout);
+          onAuthed();
+        }
+      });
+      sub = data.subscription;
+      timeout = setTimeout(() => {
+        if (cancelled) return;
+        sub?.unsubscribe();
+        setAuthed(false);
+        setLoading(false);
+      }, 6000);
     });
+
+    return () => {
+      cancelled = true;
+      sub?.unsubscribe();
+      if (timeout) clearTimeout(timeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, embedded]);
 
   useEffect(() => {
     if (timeLeft === 0 && subject && !submitting && answer.trim()) {
@@ -131,7 +203,7 @@ function PlayPageInner() {
     try {
       const res = await fetch("/api/evaluate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ subjectId: subject.id, answer: answer.trim(), mode }),
       });
 
@@ -152,13 +224,23 @@ function PlayPageInner() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
         <h1 className="text-3xl font-bold mb-4">Sign in to Play</h1>
-        <p className="text-gray-400 mb-6">You need an account to play and track your scores.</p>
-        <a
-          href="/auth/login"
-          className="inline-block bg-amber-600 hover:bg-amber-500 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-        >
-          Sign In
-        </a>
+        {embedded ? (
+          <p className="text-gray-400">
+            Log in on PeytzGames to play and track your scores.
+          </p>
+        ) : (
+          <>
+            <p className="text-gray-400 mb-6">
+              You need an account to play and track your scores.
+            </p>
+            <a
+              href="/auth/login"
+              className="inline-block bg-amber-600 hover:bg-amber-500 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+            >
+              Sign In
+            </a>
+          </>
+        )}
       </div>
     );
   }

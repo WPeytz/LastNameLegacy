@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, bearerToken } from "@/lib/supabase/server";
 import { isGameMode, type GameMode } from "@/lib/types/database";
 
 interface SubjectPickRow {
@@ -23,10 +23,11 @@ function subjectIdColumnForMode(mode: GameMode) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const token = bearerToken(request);
+    const supabase = await createClient(token);
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

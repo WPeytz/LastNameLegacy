@@ -6,7 +6,7 @@ import {
   SCORING_CATEGORIES,
   computeTotal,
 } from "@/lib/scoring";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, bearerToken } from "@/lib/supabase/server";
 import type { Surname, Game, Profile, GameMode } from "@/lib/types/database";
 
 const RequestSchema = z.object({
@@ -25,10 +25,11 @@ function tableForMode(mode: GameMode) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const token = bearerToken(request);
+    const supabase = await createClient(token);
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
