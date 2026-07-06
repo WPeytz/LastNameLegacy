@@ -170,6 +170,15 @@ function PlayPageInner() {
         }
       });
       sub = data.subscription;
+      // SessionBridge only requests the host session once, on the initial
+      // layout mount (the landing page). Reaching /play via a client-side
+      // navigation doesn't remount it, and in a cross-site iframe the earlier
+      // session isn't readable from partitioned storage — so ask the host to
+      // resend it now that we're subscribed and will catch the setSession.
+      window.parent.postMessage(
+        { type: "peytz:session:request" },
+        "https://peytzgames.com",
+      );
       timeout = setTimeout(() => {
         if (cancelled) return;
         sub?.unsubscribe();
