@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 
 // When the app runs inside an iframe (the PeytzGames play page), report the
-// content height to the parent so it can size the iframe to fit and the
-// nested scrollbar disappears.
+// content height to the parent so compact pages fit without empty space.
+// Long pages stay within the original game viewport and scroll internally.
 export default function EmbedResizer() {
   useEffect(() => {
     if (window.self === window.top) return;
+
+    const maxEmbedHeight = window.innerHeight;
 
     // html/body height and any viewport-relative min-height (min-h-screen, or
     // arbitrary values like min-h-[calc(100vh-4rem)]) all track the iframe's
@@ -26,7 +28,10 @@ export default function EmbedResizer() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         window.parent.postMessage(
-          { type: "embed:height", height: document.documentElement.scrollHeight },
+          {
+            type: "embed:height",
+            height: Math.min(document.documentElement.scrollHeight, maxEmbedHeight),
+          },
           "*",
         );
       });
